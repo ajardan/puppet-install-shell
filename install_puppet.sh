@@ -80,9 +80,9 @@ do
     f)  cmdline_filename="$OPTARG";;
     d)  cmdline_dl_dir="$OPTARG";;
     h) echo >&2 \
-      "install_puppet.sh - A shell script to install Puppet, asumming no dependancies
+      "install_puppet.sh - A shell script to install Puppet, assuming no dependencies
       usage:
-      -v   version         version to install, defaults to $latest_version
+      -v   version         version to install, defaults to \$latest_version
       -f   filename        filename for downloaded file, defaults to original name
       -d   download_dir    filename for downloaded file, defaults to /tmp/(random-number)"
       exit 0;;
@@ -120,8 +120,9 @@ elif test -f "/etc/system-release"; then
   platform_version=`sed 's/^.\+ release \([.0-9]\+\).*/\1/' /etc/system-release | tr '[A-Z]' '[a-z]'`
   # amazon is built off of fedora, so act like RHEL
   if test "$platform" = "amazon linux ami"; then
-    platform="el"
-    platform_version="6.0"
+    critical "Amazon Linux can't install older Puppet: Puppet 4 works fine on Amazon Linux"
+    report_bug
+    exit 1
   fi
 # Apple OS X
 elif test -f "/usr/bin/sw_vers"; then
@@ -179,7 +180,16 @@ if test "x$version" = "x"; then
   version="latest";
   info "Version parameter not defined, assuming latest";
 else
-  info "Version parameter defined: $version";
+  case "$version" in
+    4*)
+      critical "Cannot install Puppet >= 4 with this script, you need to use install_puppet_agent.sh"
+      report_bug
+      exit 1
+      ;;
+    *)
+      info "Version parameter defined: $version";
+      ;;
+  esac
 fi
 
 # Mangle $platform_version to pull the correct build
@@ -625,7 +635,7 @@ case $platform in
     fi
 
     if test "x$no_puppetlab_repo_download" != "x"; then
-      warn 'Skipping download of Puppet repistory, using distro upstream instead'
+      warn 'Skipping download of Puppet repository, using distro upstream instead'
     else
       do_download "$download_url"  "$download_filename"
       install_puppetlabs_repo $filetype "$download_filename"

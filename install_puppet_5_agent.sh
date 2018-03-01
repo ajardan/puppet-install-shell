@@ -80,7 +80,7 @@ do
     f)  cmdline_filename="$OPTARG";;
     d)  cmdline_dl_dir="$OPTARG";;
     h) echo >&2 \
-      "install_puppet_agent.sh - A shell script to install Puppet Agent > 4.0.0, assuming no dependencies
+      "install_puppet_agent.sh - A shell script to install Puppet Agent > 5.0.0, assuming no dependencies
       usage:
       -v   version         version to install, defaults to \$latest_version
       -f   filename        filename for downloaded file, defaults to original name
@@ -179,46 +179,19 @@ if test "x$version" = "x"; then
   version="latest";
   info "Version parameter not defined, assuming latest";
 else
-  info "Version parameter defined: $version";
-  info "Matching Puppet version to puppet-agent package version (See http://docs.puppetlabs.com/puppet/latest/reference/about_agent.html for more details)"
   case "$version" in
-    4.0.*)
-      puppet_agent_version='1.0.1'
-      ;;
-    4.1.*)
-      puppet_agent_version='1.1.1'
-      ;;
-    4.2.*)
-      puppet_agent_version='1.2.7'
-      ;;
-    4.3.*)
-      puppet_agent_version='1.3.6'
-      ;;
-    4.4.*)
-      puppet_agent_version='1.4.2'
-      ;;
-    4.5.*)
-      puppet_agent_version='1.5.3'
-      ;;
-    4.6.*)
-      puppet_agent_version='1.6.2'
-      ;;
-    4.7.*)
-      puppet_agent_version='1.7.2'
-      ;;
-    4.8.*)
-      puppet_agent_version='1.8.3'
-      ;;
-    4.9.*)
-      puppet_agent_version='1.9.3'
-      ;;
-    4.10.*)
-      puppet_agent_version='1.10.8'
-      ;;
-    *)
-      critical "Unable to match requested puppet version to puppet-agent version - Check http://docs.puppetlabs.com/puppet/latest/reference/about_agent.html"
+    3*)
+      critical "Cannot install Puppet 3 with this script. Puppet 3 is EOL, and you should upgrade. you need to use install_puppet_agent.sh"
       report_bug
       exit 1
+      ;;
+    4*)
+      critical "Cannot install Puppet 4 with this script, you need to use install_puppet_agent.sh"
+      report_bug
+      exit 1
+      ;;
+    *)
+      info "Version parameter defined: $version";
       ;;
   esac
 fi
@@ -449,26 +422,16 @@ do_download() {
 install_file() {
   case "$1" in
     "rpm")
-      if test "$platform" == "sles"; then
-        rpm -Uvh --oldpackage --replacepkgs "$2"
-        rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY-puppetlabs-PC1
-        if test "$version" = 'latest'; then
-          zypper -n --no-gpg-checks install -y puppet-agent
-        else
-          zypper -n --no-gpg-checks install -y "puppet-agent-${puppet_agent_version}"
-        fi
+      info "installing puppetlabs yum repo with rpm..."
+      if test -f "/etc/yum.repos.d/puppetlabs-pc1.repo"; then
+        info "existing puppetlabs yum repo found, moving to old location"
+        mv /etc/yum.repos.d/puppetlabs-pc1.repo /etc/yum.repos.d/puppetlabs-pc1.repo.old
+      fi
+      rpm -Uvh --oldpackage --replacepkgs "$2"
+      if test "$version" = 'latest'; then
+        yum install -y puppet-agent
       else
-        info "installing puppetlabs yum repo with rpm..."
-        if test -f "/etc/yum.repos.d/puppetlabs-pc1.repo"; then
-          info "existing puppetlabs yum repo found, moving to old location"
-          mv /etc/yum.repos.d/puppetlabs-pc1.repo /etc/yum.repos.d/puppetlabs-pc1.repo.old
-        fi
-        rpm -Uvh --oldpackage --replacepkgs "$2"
-        if test "$version" = 'latest'; then
-          yum install -y puppet-agent
-        else
-          yum install -y "puppet-agent-${puppet_agent_version}"
-        fi
+        yum install -y "puppet-agent-${version}"
       fi
       ;;
     "deb")
@@ -479,9 +442,9 @@ install_file() {
         apt-get install -y puppet-agent
       else
         if test "x$deb_codename" != "x"; then
-          apt-get install -y "puppet-agent=${puppet_agent_version}-1${deb_codename}"
+          apt-get install -y "puppet-agent=${version}-1${deb_codename}"
         else
-          apt-get install -y "puppet-agent=${puppet_agent_version}"
+          apt-get install -y "puppet-agent=${version}"
         fi
       fi
       ;;
@@ -510,38 +473,22 @@ case $platform in
     critical "Not got Puppet-agent not supported on Arch yet"
     ;;
   "freebsd")
-    info "Installing Puppet $version for FreeBSD..."
-    if test "$version" != "latest"; then
-      warn "In FreeBSD installation of older versions is not possible. Version is set to latest."
-    fi
-    case $major_version in
-      "9")
-        have_pkg=`grep -sc '^WITH_PKGNG' /etc/make.conf`
-        if test "$have_pkg" = 1; then
-          pkg install -y sysutils/puppet4
-        else
-          pkg_add -rF puppet4
-        fi
-        ;;
-      "10")
-        pkg install -y sysutils/puppet4
-        ;;
-    esac
-  ;;
+    critical "Not got Puppet-agent not supported on freebsd yet"
+    ;;
   *)
     info "Downloading Puppet $version for ${platform}..."
     case $platform in
       "el")
         info "Red hat like platform! Lets get you an RPM..."
         filetype="rpm"
-        filename="puppetlabs-release-pc1-el-${platform_version}.noarch.rpm"
-        download_url="http://yum.puppetlabs.com/${filename}"
+        filename="puppet5-release-el-${platform_version}.noarch.rpm"
+        download_url="http://yum.puppetlabs.com/puppet5/${filename}"
         ;;
       "fedora")
         info "Fedora platform! Lets get the RPM..."
         filetype="rpm"
-        filename="puppetlabs-release-pc1-fedora-${platform_version}.noarch.rpm"
-        download_url="http://yum.puppetlabs.com/${filename}"
+        filename="puppet5-release-fedora-${platform_version}.noarch.rpm"
+        download_url="http://yum.puppetlabs.com/puppet5/${filename}"
         ;;
       "debian")
         info "Debian platform! Lets get you a DEB..."
@@ -553,7 +500,7 @@ case $platform in
           "9") deb_codename="stretch";;
         esac
         filetype="deb"
-        filename="puppetlabs-release-pc1-${deb_codename}.deb"
+        filename="puppet5-release-${deb_codename}.deb"
         download_url="http://apt.puppetlabs.com/${filename}"
         ;;
       "ubuntu")
@@ -572,17 +519,11 @@ case $platform in
           "14.10") utopic;;
         esac
         filetype="deb"
-        filename="puppetlabs-release-pc1-${deb_codename}.deb"
+        filename="puppet5-release-${deb_codename}.deb"
         download_url="http://apt.puppetlabs.com/${filename}"
         ;;
       "mac_os_x")
         critical "Script doesn't Puppet-agent not supported on OSX yet"
-        ;;
-      "sles")
-        info "SLES platform! Lets get the RPM..."
-        filetype="rpm"
-        filename="puppetlabs-release-pc1-1.1.0-5.sles${platform_version}.noarch.rpm"
-        download_url="https://yum.puppetlabs.com/sles/${platform_version}/PC1/x86_64/${filename}"
         ;;
       *)
         critical "Sorry $platform is not supported yet!"
